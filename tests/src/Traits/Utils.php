@@ -146,4 +146,28 @@ trait Utils {
     return civicrm_api3('Contact', 'create', $vars);
   }
 
+  /**
+   * Override pressButton to deal with new chrome issues. Stolen from
+   * https://git.drupalcode.org/project/lms/-/merge_requests/82/diffs#e8d889b2b6302fed089d688dcd74ff2f907afdd8_668_673
+   * See https://www.drupal.org/project/drupal/issues/3471113
+   */
+  protected function pressButtonOverride(string $selector, string $type = 'default'): void {
+    $session = $this->getSession();
+    $page = $session->getPage();
+    $before = $page->getHtml();
+    if ($type === 'default') {
+      $button = $page->findButton($selector);
+    }
+    else {
+      $button = $page->find($type, $selector);
+    }
+    $this->assertNotNull($button, \sprintf('Button "%s" not found.', $selector));
+    $button->press();
+    $result = $page->waitFor(5, function (\Behat\Mink\Element\DocumentElement $page) use ($before, $session) {
+      $page_html = $page->getHtml();
+      return $page_html !== '' && \strcmp($page_html, $before) !== 0 && (bool) $session->evaluateScript('document.readyState === "complete"');
+    });
+    $this->assertTrue($result, \sprintf("Pressing of the %s button didn't produce any results or page wasn't properly loaded afterwards.", $selector));
+  }
+
 }
